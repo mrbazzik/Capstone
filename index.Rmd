@@ -1,0 +1,135 @@
+---
+title: "index"
+output: html_document
+---
+```{r}
+library("tm")
+```
+
+1. Obtaining the data
+2. Familiarizing yourself with NLP and text mining
+
+```{r}
+set.seed(123)
+selectRandomData<-function(vec, prop){
+    selects<-rbinom(length(vec),1,prop)==1
+    vec[selects]
+}
+
+readDocuments<-function(path, prop){
+    con <- file(path, "r") 
+    docs<-readLines(con)
+    close(con)
+    selectRandomData(docs, prop)
+}
+
+setwd("c:/Users/Basov_il/Documents/GitHub/Capstone/")
+
+twits<-readDocuments("final/en_US/en_US.twitter.txt", 0.0001)
+news<-readDocuments("final/en_US/en_US.news.txt", 0.0001)
+blogs<-readDocuments("final/en_US/en_US.blogs.txt", 0.0001)
+
+data<-c(twits, blogs, news)
+
+```
+
+```{r}
+remove(twits)
+remove(blogs)
+remove(news)
+
+con <- file("dataset.txt")
+writeLines(data, con)
+close(con)
+```
+
+2. Tokenization
+3. Profanity filtering
+
+```{r}
+corps <- VCorpus(VectorSource(data))
+remove(data)
+
+writeLines(as.character(corps), con="corpus.txt")
+
+remove(corps)
+
+#http://www.freewebheaders.com/full-list-of-bad-words-banned-by-google/
+badwords <- readLines("badwords.txt")
+
+corps <- tm_map(corps, removePunctuation)
+corps <- tm_map(corps, removeNumbers)
+corps <- tm_map(corps, removeWords, badwords)
+corps <- tm_map(corps, stripWhitespace)
+
+tdm<-TermDocumentMatrix(corps)
+
+remove(tdm)
+
+```
+
+```{r}
+dim(tdm)
+inspect(tdm[1:50,1:10])
+tdmFreq<-removeSparseTerms(tdm, 0.98)
+dim(tdmFreq)
+inspect(tdmFreq)
+
+findFreqTerms(tdm, 50)
+
+```
+
+```{r}
+mat<-as.matrix(tdmFreq)
+library(reshape2)
+mat <- melt(mat, value.name = "count")
+head(mat)
+
+library(ggplot2)
+
+ggplot(mat, aes(x = Docs, y = Terms, fill = log10(count))) +
+     geom_tile(colour = "white") +
+     scale_fill_gradient(high="#FF0000" , low="#FFFFFF")+
+     ylab("") 
+     #theme(panel.background = element_blank()) +
+     #theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()
+    #)
+
+
+df<-NULL
+terms <- tdmFreq$dimnames$Terms
+for (el in terms){
+    assocs<-findAssocs(tdmFreq, el, 0)
+    res<-rep(0, length(terms))
+    names(res)<-terms
+    l<-list(x<-res)
+    names(l)<-el
+    for (term in terms){
+        values<-assocs[[el]]
+        if (term %in% names(values)){
+            l[[el]][term]<-values[term]
+        } 
+    }
+    if (is.null(df)){
+        
+        df<-data.frame(l)
+    }else {
+        df[el]<-l
+    }
+    }
+
+mat<-as.matrix(df)
+library(reshape2)
+mat <- melt(mat, value.name = "count")
+
+ggplot(mat, aes(x = Var1, y = Var2, fill = log10(count))) +
+     geom_tile(colour = "white") +
+     scale_fill_gradient(high="#FF0000" , low="#FFFFFF")+
+     ylab("") 
+```
+
+```{r, echo=FALSE}
+plot(cars)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
