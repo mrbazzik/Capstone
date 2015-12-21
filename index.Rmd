@@ -1,5 +1,5 @@
 ---
-title: "Predicting the next word"
+title: "Capstone Project: Predicting the next word"
 output: html_document
 ---
 Introduction
@@ -29,15 +29,15 @@ readDocuments<-function(path, prop){
     selectRandomData(docs, prop)
 }
 
-setwd("c:/Users/Basov_il/Documents/GitHub/Capstone/")
-
-twits<-readDocuments("final/en_US/en_US.twitter.txt", 0.0001)
-news<-readDocuments("final/en_US/en_US.news.txt", 0.0001)
-blogs<-readDocuments("final/en_US/en_US.blogs.txt", 0.0001)
+twits<-readDocuments("final/en_US/en_US.twitter.txt", 0.1)
+news<-readDocuments("final/en_US/en_US.news.txt", 0.1)
+blogs<-readDocuments("final/en_US/en_US.blogs.txt", 0.1)
 
 data<-c(twits, blogs, news)
 
 ```
+
+At this point we have list of documents, consisting of 10% from each source.
 
 Cleaning data
 ------------------------------
@@ -74,77 +74,82 @@ bi_tdm <- TermDocumentMatrix(corps, control = list(tokenize = BigramTokenizer))
 
 TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
 tri_tdm <- TermDocumentMatrix(corps, control = list(tokenize = TrigramTokenizer))
+
+FourgramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 4, max = 4))
+four_tdm <- TermDocumentMatrix(corps, control = list(tokenize = FourgramTokenizer))
 ```
 
 Exploratory analysis
 --------------------------------------
-First, let's inspect matrices that we've got at the previous stage.
-
-```{r}
-dim(uni_tdm)
-inspect(uni_tdm[1:10,1:10])
-```
-We see that there are more than 2000 unique terms and at the same time matrix is very sparse. We can try improve it by removing very sparse terms.
-```{r}
-uni_tdmFreq<-removeSparseTerms(uni_tdm, 0.99)
-dim(uni_tdmFreq)
-```
-
-Only 64 left. Let's stay with them and do the same operations with two other matrices with appropriate filtering.
-
-```{r}
-dim(bi_tdm)
-inspect(bi_tdm[1:10,1:10])
-bi_tdmFreq<-removeSparseTerms(bi_tdm, 0.99)
-dim(bi_tdmFreq)
-
-dim(tri_tdm)
-inspect(tri_tdmFreq[1:10,1:10])
-tri_tdmFreq<-removeSparseTerms(tri_tdm, 0.996)
-dim(tri_tdmFreq)
-```
-
 We can look at histograms, showing the frequencies of different word chunks.
 ```{r}
-uni_Freq<-apply(uni_tdmFreq,1,sum)
-uni_Freq<-sort(uni_Freq, decreasing=T)
-barplot(uni_Freq[1:20], las=2)
+library(slam)
+uni_freq<-row_sums(uni_tdm)
+uni_freq<-sort(uni_freq, decreasing=T)
+par(mar=c(10,4,2,2))
+barplot(uni_freq[1:50], las=2, main="Most frequent unigrams")
 
-bi_Freq<-apply(bi_tdmFreq,1,sum)
-bi_Freq<-sort(bi_Freq, decreasing=T)
-barplot(bi_Freq[1:20], las=2)
+bi_freq<-row_sums(bi_tdm)
+bi_freq<-sort(bi_freq, decreasing=T)
+barplot(bi_freq[1:50], las=2, main="Most frequent bigrams")
 
-tri_Freq<-apply(tri_tdmFreq,1,sum)
-tri_Freq<-sort(tri_Freq, decreasing=T)
-barplot(tri_Freq[1:20], las=2)
+tri_freq<-row_sums(tri_tdm)
+tri_freq<-sort(tri_freq, decreasing=T)
+barplot(tri_freq[1:50], las=2, main="Most frequent trigrams")
+
+four_freq<-row_sums(four_tdm)
+four_freq<-sort(four_freq, decreasing=T)
+barplot(four_freq[1:50], las=2, main="Most frequent fourgrams")
+
 ```
 
-Now let's look at the distribution of word chunks among documents (white for one occurence in document, more red for more occurencies).
+As we see most common chunks mostly consist of language stop words which is expected.
+
+Now let's explore how many tokens cover which percentage of the whole number of words in collections.
 
 ```{r}
-library(reshape2)
-library(ggplot2)
-
-freq_m<-as.matrix(uni_tdmFreq)
-freq_m <- melt(freq_m, value.name = "Count")
-ggplot(freq_m, aes(x = Docs, y = Terms, fill = log10(Count))) +
-     geom_tile(colour = "white") +
-     scale_fill_gradient(high="#FF0000" , low="#FFFFFF")+
-     ylab("") 
-
-freq_m<-as.matrix(bi_tdmFreq)
-freq_m <- melt(freq_m, value.name = "Count")
-ggplot(freq_m, aes(x = Docs, y = Terms, fill = log10(Count))) +
-     geom_tile(colour = "white") +
-     scale_fill_gradient(high="#FF0000" , low="#FFFFFF")+
-     ylab("") 
-
-freq_m<-as.matrix(tri_tdmFreq)
-freq_m <- melt(freq_m, value.name = "Count")
-ggplot(freq_m, aes(x = Docs, y = Terms, fill = log10(Count))) +
-     geom_tile(colour = "white") +
-     scale_fill_gradient(high="#FF0000" , low="#FFFFFF")+
-     ylab("") 
-     
-
+explore_terms<-function(freq, step){
+  total_sum<-sum(freq)
+  freq<-sort(freq, decreasing=T)
+  step<-floor(total_sum*step)
+  count<-step
+  cover<-c()
+  counts<-c()
+  while(count<=total_sum){
+    prop<-sum(freq[1:count], na.rm=T)/total_sum
+    cover<-c(cover,prop)
+    counts<-c(counts,count)
+    if(prop==1) break
+    count<-count+step
+  }
+  plot(counts, cover)
+}
+length(uni_freq)
+explore_terms(uni_freq,0.001)
 ```
+
+As we see on this plot 90% of words are covered by just 15000 unigram tokens.
+```{r}
+length(bi_freq)
+explore_terms(bi_freq,0.01)
+```
+
+At this plot it is seen that 80% covearge occurs at about 700000 bigram tokens.
+```{r}
+length(tri_freq)
+explore_terms(tri_freq,0.01)
+```
+
+Here 80% coverage is maintained by approximately 3000000 trigram tokens.
+
+```{r}
+length(four_freq)
+explore_terms(four_freq,0.01)
+```
+
+Here 80% of words are covered by approximately 4000000 fourgram tokens.
+
+Conclusion
+-------------------------------
+As word prediction by full sentence can be simplifed (by Markov approximation) to prediction by n-grams, we will use our fourgrams, trigrams, bigrams and unigrams (according to backoff method) to predict the next word in user input.
+It's quite reasonable not to store all the tokens in memory for prediction purposes because good coverage can be reached with less amount of them in order to achieve memory and speed efficiency (good tradeoff is needed here). 
