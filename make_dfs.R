@@ -43,6 +43,15 @@ df1<-aggregate(Ind~FirstWord+SecondWord, df_tri_fin, min)
 df_tri_fin<-df_tri_fin[df_tri_fin$Ind %in% df1$Ind,]
 save(df_tri_fin, file="tri_freq.Rda")
 
+df_tri_fin$FirstWord<-tolower(df_tri_fin$FirstWord)
+df_tri_fin$SecondtWord<-tolower(df_tri_fin$SecondWord)
+df_tri_fin$Prediction1<-tolower(df_tri_fin$Prediction1)
+df1<-aggregate(Ind~FirstWord+SecondWord+Prediction1, df_tri_fin, min)
+
+bi_df$FirstWord<-tolower(bi_df$FirstWord)
+bi_df$Prediction<-tolower(bi_df$Prediction)
+df1<-aggregate(Ind~FirstWord+Prediction, bi_df, min)
+
 v<-sapply(names(four_tdm_freq), fourth_word)
 v1<-sapply(names(four_tdm_freq), first_word)
 v2<-sapply(names(four_tdm_freq), second_word)
